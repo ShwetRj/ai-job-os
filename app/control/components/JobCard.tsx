@@ -1,6 +1,9 @@
 "use client"
 
-export default function JobCard({ job, setJobs }: any) {
+import { useState } from "react"
+
+export default function JobCard({ job, setJobs, recruiters = [] }: any) {
+  const [reason, setReason] = useState<string | null>(null)
 
   function getPriority(score: number) {
     if (score >= 90) return "🔥 High"
@@ -10,24 +13,20 @@ export default function JobCard({ job, setJobs }: any) {
 
   async function apply() {
     try {
-      // 🔥 Track click
       await fetch("/api/click", {
         method: "POST",
         body: JSON.stringify({ id: job.id }),
       })
 
-      // 🔥 Open job page
       if (job.url) {
         window.open(job.url, "_blank")
       }
 
-      // 🔥 Apply (trigger n8n + DB update)
       await fetch("/api/apply", {
         method: "POST",
         body: JSON.stringify(job),
       })
 
-      // 🔥 Update UI instantly
       setJobs((prev: any) =>
         prev.map((j: any) =>
           j.id === job.id ? { ...j, applied: true } : j
@@ -39,17 +38,45 @@ export default function JobCard({ job, setJobs }: any) {
     }
   }
 
+  async function assignRecruiter(recruiterId: string) {
+    await fetch("/api/update-job", {
+      method: "POST",
+      body: JSON.stringify({
+        id: job.id,
+        recruiter_id: recruiterId
+      })
+    })
+  }
+
+  async function fetchReason() {
+    const res = await fetch("/api/gpt-score", {
+      method: "POST",
+      body: JSON.stringify({ job })
+    })
+
+    const data = await res.json()
+    setReason(data.reason)
+  }
+
+  const recruiter = recruiters.find(
+    (r: any) => r.id === job.recruiter_id
+  )
+
+  const isFollowUpDue =
+    job.follow_up_date &&
+    new Date(job.follow_up_date) <= new Date()
+
   return (
-    <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 mb-4 hover:shadow-xl hover:scale-[1.01] transition-all">
+    <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 mb-6 hover:shadow-xl hover:scale-[1.01] transition-all space-y-4">
 
       {/* 🔹 Title */}
-      <h2 className="text-xl font-semibold">{job.title}</h2>
-
-      {/* 🔹 Company */}
-      <p className="text-gray-400">{job.company}</p>
+      <div>
+        <h2 className="text-xl font-semibold">{job.title}</h2>
+        <p className="text-gray-400">{job.company}</p>
+      </div>
 
       {/* 🔹 Meta */}
-      <div className="flex gap-4 mt-3 text-sm items-center flex-wrap">
+      <div className="flex gap-4 text-sm items-center flex-wrap">
 
         <span>
           Score:{" "}
@@ -65,12 +92,10 @@ export default function JobCard({ job, setJobs }: any) {
           </b>
         </span>
 
-        {/* 🔥 Priority */}
         <span className="px-2 py-1 text-xs rounded-full bg-yellow-500/20 text-yellow-400">
           {getPriority(job.success_score || job.score)}
         </span>
 
-        {/* 🔥 Status */}
         <span
           className={`px-2 py-1 rounded-full text-xs ${
             job.applied
@@ -80,10 +105,56 @@ export default function JobCard({ job, setJobs }: any) {
         >
           {job.applied ? "Applied" : "New"}
         </span>
+
+      </div>
+
+      {/* 🔹 Recruiter Assign */}
+      <div className="space-y-1">
+        <select
+          value={job.recruiter_id || ""}
+          onChange={(e) => assignRecruiter(e.target.value)}
+          className="w-full bg-black/50 text-xs p-2 rounded"
+        >
+          <option value="">Assign Recruiter</option>
+          {recruiters.map((r: any) => (
+            <option key={r.id} value={r.id}>
+              {r.name} ({r.company})
+            </option>
+          ))}
+        </select>
+
+        {recruiter && (
+          <div className="text-xs text-gray-400">
+            👤 {recruiter.name}
+          </div>
+        )}
+      </div>
+
+      {/* 🔹 Follow-up Alert */}
+      {isFollowUpDue && (
+        <div className="text-xs bg-red-500/20 p-2 rounded">
+          ⚠ Follow-up due
+        </div>
+      )}
+
+      {/* 🔹 AI WHY PANEL */}
+      <div className="text-xs">
+        <button
+          onClick={fetchReason}
+          className="text-purple-400 underline"
+        >
+          Why this score?
+        </button>
+
+        {reason && (
+          <div className="bg-white/5 p-2 mt-2 rounded text-gray-300">
+            {reason}
+          </div>
+        )}
       </div>
 
       {/* 🔹 Tracking Info */}
-      <div className="mt-2 text-xs text-gray-400 space-y-1">
+      <div className="text-xs text-gray-400 space-y-1">
         {job.clicked_at && (
           <p>
             👁 Viewed: {new Date(job.clicked_at).toLocaleString()}
@@ -97,7 +168,7 @@ export default function JobCard({ job, setJobs }: any) {
       </div>
 
       {/* 🔹 Actions */}
-      <div className="mt-5 flex gap-3">
+      <div className="flex gap-3 flex-wrap">
 
         {!job.applied ? (
           <button
@@ -124,7 +195,18 @@ export default function JobCard({ job, setJobs }: any) {
             View Job
           </a>
         )}
+
+        {recruiter?.email && (
+          <a
+            href={`mailto:${recruiter.email}`}
+            className="border border-blue-400 px-5 py-2 rounded-lg text-blue-400 hover:bg-blue-400/10"
+          >
+            Email Recruiter
+          </a>
+        )}
+
       </div>
+
     </div>
   )
 }

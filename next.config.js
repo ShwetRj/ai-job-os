@@ -1,6 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  allowedDevOrigins: ['64.227.153.140'],
+  reactStrictMode: true,
+
+  // 🔥 Needed when behind nginx / reverse proxy
+  output: "standalone",
+
+  // Optional but useful
+  images: {
+    unoptimized: true,
+  },
 }
 
 module.exports = nextConfig

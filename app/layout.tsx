@@ -1,82 +1,100 @@
 "use client"
 
 import "./globals.css"
-import { useState } from "react"
 import Link from "next/link"
+import { useEffect, useState } from "react"
+import { supabase } from "@/lib/supabaseClient"
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  const [open, setOpen] = useState(false)
+export default function RootLayout({ children }: any) {
+  const [user, setUser] = useState<any>(null)
 
-const links = [
-  { name: "Dashboard", href: "/control" },
-  { name: "Jobs", href: "/control?tab=new" },
-  { name: "Applied", href: "/control?tab=applied" },
-  { name: "Outreach", href: "/control?tab=crm" },
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user)
+    })
 
-  // 🔥 Tools
-  { name: "n8n", href: "/n8n" },
-  { name: "Retool", href: "/retool" },
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user || null)
+    })
 
-  // 🔥 Pages
-  { name: "Hire Me", href: "/hire/google" },
-]
+    return () => {
+      listener.subscription.unsubscribe()
+    }
+  }, [])
+
+  async function logout() {
+    await supabase.auth.signOut()
+    window.location.href = "/"
+  }
 
   return (
     <html lang="en">
-      <body className="bg-gradient-to-b from-slate-900 to-black text-white">
+      <body className="bg-[#020617] text-white antialiased">
 
-        {/* 🔝 TOPBAR */}
-        <div className="hidden md:flex justify-between items-center px-10 py-4 border-b border-white/10">
-          <h1 className="text-xl font-bold">🚀 Career OS</h1>
+        {/* 🔥 SAAS NAVBAR */}
+        <nav className="sticky top-0 z-50 backdrop-blur-lg bg-white/5 border-b border-white/10">
+          <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
 
-          <div className="flex gap-6">
-            {links.map((link) => (
-              <a key={link.name} href={link.href}>
-                <span className="hover:text-blue-400 cursor-pointer">
-                  {link.name}
-                </span>
-              </a>
-            ))}
-          </div>
-        </div>
+            {/* LOGO */}
+            <Link href="/" className="font-bold text-xl tracking-wide">
+              🚀 Career OS
+            </Link>
 
-        {/* 📱 MOBILE TOPBAR */}
-        <div className="md:hidden flex justify-between p-4 border-b border-white/10">
-          <button onClick={() => setOpen(true)}>☰</button>
-          <h1>Career OS</h1>
-        </div>
+            {/* MENU */}
+            <div className="flex gap-6 items-center text-sm">
 
-        {/* 📱 SIDEBAR */}
-        {open && (
-          <div className="fixed inset-0 bg-black/80 z-50">
-            <div className="w-64 bg-slate-900 h-full p-6">
-              <button
-                onClick={() => setOpen(false)}
-                className="mb-4"
-              >
-                ✖ Close
-              </button>
+              <Link href="/" className="hover:text-blue-400">Home</Link>
 
-              {links.map((link) => (
-                <Link key={link.name} href={link.href}>
-                  <p
-                    onClick={() => setOpen(false)}
-                    className="py-3 border-b border-white/10"
-                  >
-                    {link.name}
-                  </p>
-                </Link>
-              ))}
+              {user && (
+                <>
+                  <Link href="/control" className="hover:text-blue-400">Dashboard</Link>
+                  <Link href="/control/jobs" className="hover:text-blue-400">Jobs</Link>
+                  <Link href="/control/applied" className="hover:text-blue-400">Applied</Link>
+                  <Link href="/control/crm" className="hover:text-blue-400">CRM</Link>
+                  <Link href="/hire-me" className="hover:text-blue-400">Hire Me</Link>
+                </>
+              )}
+
+              {/* EXTERNAL */}
+              <Link href="https://n8n.jobhuntingaiagent.me" target="_blank" className="hover:text-purple-400">
+                n8n
+              </Link>
+              <Link href="https://retool.jobhuntingaiagent.me" target="_blank" className="hover:text-purple-400">
+                Retool
+              </Link>
+
+              {/* AUTH */}
+              {!user ? (
+                <>
+                  <Link href="/login" className="border border-white/20 px-3 py-1 rounded hover:bg-white/10">
+                    Login
+                  </Link>
+                  <Link href="/signup" className="bg-blue-600 px-3 py-1 rounded hover:bg-blue-500">
+                    Signup
+                  </Link>
+                </>
+              ) : (
+                <button
+                  onClick={logout}
+                  className="bg-red-500 px-3 py-1 rounded hover:bg-red-400"
+                >
+                  Logout
+                </button>
+              )}
             </div>
           </div>
-        )}
+        </nav>
 
-        {/* 📦 PAGE CONTENT */}
-        <main className="p-6 md:p-10">{children}</main>
+        {/* 🔥 MAIN LAYOUT WRAPPER */}
+        <div className="min-h-screen">
+
+          {/* 🔥 PROPER CENTERED + SPACED CONTAINER */}
+          <main className="max-w-7xl mx-auto px-6 py-12 space-y-10">
+            {children}
+          </main>
+
+        </div>
+
       </body>
     </html>
   )

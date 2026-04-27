@@ -1,199 +1,220 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { usePathname } from "next/navigation"
-import { supabase } from "@/lib/supabase"
+import { supabase } from "@/lib/supabaseClient"
+import WhyScore from "@/components/WhyScore"
+import {
+  DragDropContext,
+  Droppable,
+  Draggable
+} from "@hello-pangea/dnd"
 
-export default function JobsPage() {
+const columns = ["New", "Applied", "Interview", "Offer", "Rejected"]
+
+export default function Jobs() {
   const [jobs, setJobs] = useState<any[]>([])
-  const pathname = usePathname()
-
-  // 🔥 Determine view from URL
-  const view =
-    pathname.includes("applied") ? "applied" :
-    pathname.includes("crm") ? "crm" :
-    "new"
-
-  // 🔥 Fetch jobs
-  async function fetchJobs() {
-    let query = supabase
-      .from("jobs")
-      .select("*")
-      .gte("score", 70)
-      .order("score", { ascending: false })
-
-    const { data } = await query
-    setJobs(data || [])
-  }
+  const [recruiters, setRecruiters] = useState<any[]>([])
 
   useEffect(() => {
     fetchJobs()
-
-    // 🔥 Real-time updates
-    const channel = supabase
-      .channel("jobs-realtime")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "jobs" },
-        () => {
-          fetchJobs()
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
+    fetchRecruiters()
   }, [])
 
-  // 🔥 Filter based on route
-  const filteredJobs = jobs.filter((job) => {
-    if (view === "applied") return job.applied
-    if (view === "crm") return job.recruiter_email
-    return !job.applied
-  })
+  async function fetchJobs() {
+    const { data } = await supabase.from("jobs").select("*")
+    setJobs(data || [])
+  }
 
-  // 🔥 Apply function
+  async function fetchRecruiters() {
+    const { data } = await supabase.from("recruiter_crm").select("*")
+    setRecruiters(data || [])
+  }
+
+  async function updateStatus(id: string, status: string) {
+    await supabase.from("jobs").update({ status }).eq("id", id)
+  }
+
+  async function assignRecruiter(jobId: string, recruiterId: string) {
+    await supabase
+      .from("jobs")
+      .update({ recruiter_id: recruiterId })
+      .eq("id", jobId)
+
+    fetchJobs()
+  }
+
   async function apply(job: any) {
-    try {
-      // Track click
-      await fetch("/api/click", {
-        method: "POST",
-        body: JSON.stringify({ id: job.id }),
+    // 🔥 instant UI update
+    setJobs((prev) =>
+      prev.map((j) =>
+        j.id === job.id
+          ? { ...j, applied: true, status: "Applied" }
+          : j
+      )
+    )
+
+    await supabase
+      .from("jobs")
+      .update({
+        applied: true,
+        status: "Applied",
+        applied_at: new Date().toISOString(),
+        follow_up_date: new Date(
+          Date.now() + 3 * 24 * 60 * 60 * 1000
+        )
       })
+      .eq("id", job.id)
+  }
 
-      // Open job
-      if (job.url) {
-        window.open(job.url, "_blank")
-      }
+  async function onDragEnd(result: any) {
+    if (!result.destination) return
 
-      // Apply
-      await fetch("/api/apply", {
-        method: "POST",
-        body: JSON.stringify(job),
-      })
+    const jobId = result.draggableId
+    const newStatus = result.destination.droppableId
 
-      fetchJobs()
-    } catch (err) {
-      console.error(err)
-    }
+    // 🔥 instant UI update
+    setJobs((prev) =>
+      prev.map((j) =>
+        j.id === jobId ? { ...j, status: newStatus } : j
+      )
+    )
+
+    await updateStatus(jobId, newStatus)
   }
 
   return (
-    <div className="min-h-screen p-6 md:p-10">
+    <div className="space-y-10">
 
-      {/* 🔥 HEADER */}
-      <h1 className="text-3xl font-bold mb-6 capitalize">
-        {view} Jobs
-      </h1>
+      <h1 className="text-4xl font-bold">🗂 Job Pipeline</h1>
 
-      {/* 🔥 EMPTY STATE */}
-      {filteredJobs.length === 0 && (
-        <p className="text-gray-400">No jobs found</p>
-      )}
+      <DragDropContext onDragEnd={onDragEnd}>
+        <div className="grid md:grid-cols-5 gap-6">
 
-      {/* 🔥 JOB LIST */}
-      <div className="space-y-4">
-        {filteredJobs.map((job) => (
-          <div
-            key={job.id}
-            className="bg-white/5 backdrop-blur-md border border-white/10 rounded-xl p-5 hover:scale-[1.01] transition"
-          >
-
-            {/* Title */}
-            <h2 className="text-lg font-semibold">
-              {job.title}
-            </h2>
-
-            {/* Company */}
-            <p className="text-gray-400">
-              {job.company}
-            </p>
-
-            {/* Meta */}
-            <div className="flex flex-wrap gap-3 mt-2 text-sm">
-
-              <span>
-                Score:{" "}
-                <b className="text-green-400">
-                  {job.score || "N/A"}
-                </b>
-              </span>
-
-              <span>
-                Success:{" "}
-                <b className="text-purple-400">
-                  {job.success_score || "N/A"}
-                </b>
-              </span>
-
-              {/* Status */}
-              <span
-                className={`px-2 py-1 rounded-full text-xs ${
-                  job.applied
-                    ? "bg-green-500/20 text-green-400"
-                    : "bg-gray-500/20 text-gray-400"
-                }`}
-              >
-                {job.applied ? "Applied" : "New"}
-              </span>
-            </div>
-
-            {/* Tracking */}
-            <div className="text-xs text-gray-400 mt-2">
-              {job.clicked_at && (
-                <p>
-                  👁 Viewed:{" "}
-                  {new Date(job.clicked_at).toLocaleString()}
-                </p>
-              )}
-              {job.applied_at && (
-                <p>
-                  ✅ Applied:{" "}
-                  {new Date(job.applied_at).toLocaleString()}
-                </p>
-              )}
-            </div>
-
-            {/* AI Insights */}
-            {job.ai_reason && (
-              <p className="text-xs text-purple-300 mt-2">
-                🤖 {job.ai_reason}
-              </p>
-            )}
-
-            {/* Actions */}
-            <div className="mt-4 flex gap-3">
-
-              {!job.applied ? (
-                <button
-                  onClick={() => apply(job)}
-                  className="bg-gradient-to-r from-blue-500 to-indigo-600 px-4 py-2 rounded-lg hover:scale-105 transition"
+          {columns.map((col) => (
+            <Droppable droppableId={col} key={col}>
+              {(provided) => (
+                <div
+                  ref={provided.innerRef}
+                  {...provided.droppableProps}
+                  className="bg-white/5 p-4 rounded-xl min-h-[400px]"
                 >
-                  🚀 Apply
-                </button>
-              ) : (
-                <button
-                  disabled
-                  className="bg-green-600/70 px-4 py-2 rounded-lg"
-                >
-                  ✅ Applied
-                </button>
-              )}
+                  <h2 className="mb-4 font-semibold">{col}</h2>
 
-              {job.url && (
-                <a
-                  href={job.url}
-                  target="_blank"
-                  className="border border-white/20 px-4 py-2 rounded-lg hover:bg-white/10"
-                >
-                  View Job
-                </a>
+                  {jobs
+                    .filter(Boolean)
+                    .filter(
+                      (j) =>
+                        j.status === col ||
+                        (!j.status && col === "New")
+                    )
+                    .map((job, index) => {
+
+                      const recruiter = recruiters.find(
+                        (r) => r.id === job.recruiter_id
+                      )
+
+                      const isFollowUpDue =
+                        job.follow_up_date &&
+                        new Date(job.follow_up_date) <= new Date()
+
+                      return (
+                        <Draggable
+                          key={job.id}
+                          draggableId={String(job.id)}
+                          index={index}
+                        >
+                          {(provided) => (
+                            <div
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              className="bg-black/40 p-4 mb-3 rounded-lg space-y-3"
+                            >
+
+                              {/* 🔥 DRAG HANDLE ONLY */}
+                              <div
+                                {...provided.dragHandleProps}
+                                className="cursor-grab text-xs text-gray-500"
+                              >
+                                ⠿ Drag
+                              </div>
+
+                              {/* JOB INFO */}
+                              <div>
+                                <p className="font-semibold">
+                                  {job.company}
+                                </p>
+                                <p className="text-sm text-gray-400">
+                                  {job.title}
+                                </p>
+                              </div>
+
+                              {/* SCORE */}
+                              <p className="text-xs text-blue-400">
+                                Score: {job.score || 0}
+                              </p>
+
+                              {/* APPLY BUTTON */}
+                              {!job.applied && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    apply(job)
+                                  }}
+                                  className="w-full bg-blue-500 py-1 rounded text-xs hover:bg-blue-600"
+                                >
+                                  🚀 Apply
+                                </button>
+                              )}
+
+                              {/* RECRUITER */}
+                              <select
+                                value={job.recruiter_id || ""}
+                                onChange={(e) => {
+                                  e.stopPropagation()
+                                  assignRecruiter(job.id, e.target.value)
+                                }}
+                                className="w-full bg-black/50 text-xs p-1 rounded"
+                              >
+                                <option value="">Assign Recruiter</option>
+                                {recruiters.map((r) => (
+                                  <option key={r.id} value={r.id}>
+                                    {r.name} ({r.company})
+                                  </option>
+                                ))}
+                              </select>
+
+                              {/* SHOW RECRUITER */}
+                              {recruiter && (
+                                <div className="text-xs text-gray-400">
+                                  👤 {recruiter.name}
+                                </div>
+                              )}
+
+                              {/* FOLLOW-UP ALERT */}
+                              {isFollowUpDue && (
+                                <div className="text-xs bg-red-500/20 p-2 rounded">
+                                  ⚠ Follow-up due
+                                </div>
+                              )}
+
+                              {/* AI */}
+                              <WhyScore job={job} />
+
+                            </div>
+                          )}
+                        </Draggable>
+                      )
+                    })}
+
+                  {provided.placeholder}
+                </div>
               )}
-            </div>
-          </div>
-        ))}
-      </div>
+            </Droppable>
+          ))}
+
+        </div>
+      </DragDropContext>
+
     </div>
   )
 }

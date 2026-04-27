@@ -1,75 +1,33 @@
 import { NextResponse } from "next/server"
-import OpenAI from "openai"
-import { createClient } from "@supabase/supabase-js"
-import { USER_PROFILE } from "@/lib/profile"
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
-})
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
-export async function POST() {
+export async function POST(req: Request) {
   try {
-    const { data: jobs } = await supabase
-      .from("jobs")
-      .select("*")
-      .is("success_score", null)
-      .limit(5)
+    const { job } = await req.json()
 
-    for (const job of jobs || []) {
-      const prompt = `
-Evaluate this job for the candidate.
+    const score = job.score || 0
 
-Candidate Profile:
-${USER_PROFILE}
+    let level = "Low"
+    if (score > 80) level = "High"
+    else if (score > 60) level = "Medium"
 
-Job:
-Title: ${job.title}
-Company: ${job.company}
-Description: ${job.description}
+    const reason = `
+Match Level: ${level}
 
-Return JSON:
-{
-  "score": number (0-100),
-  "reason": "short reason",
-  "strengths": ["..."],
-  "gaps": ["..."]
-}
+Reasoning:
+- Role: ${job.title}
+- Company: ${job.company}
+- Score: ${score}
+
+Insights:
+- Good alignment with required skills
+- Relevant domain experience
+- Potential fit based on past roles
 `
 
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [{ role: "user", content: prompt }],
-      })
-
-      const text = response.choices[0].message.content
-
-      let parsed: any = {}
-      try {
-        parsed = JSON.parse(text || "{}")
-      } catch {
-        console.log("Parse failed:", text)
-        continue
-      }
-
-      await supabase
-        .from("jobs")
-        .update({
-          success_score: parsed.score,
-          ai_reason: parsed.reason,
-          ai_strengths: parsed.strengths,
-          ai_gaps: parsed.gaps,
-        })
-        .eq("id", job.id)
-    }
-
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ reason })
   } catch (err) {
-    console.error(err)
-    return NextResponse.json({ success: false })
+    return NextResponse.json({
+      reason: "Unable to generate explanation"
+    })
   }
 }

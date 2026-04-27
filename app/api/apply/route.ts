@@ -11,22 +11,28 @@ export async function POST(req: Request) {
   try {
     const job = await req.json()
 
-    if (!job?.id) {
+    // ✅ Basic validation
+    if (!job?.id || !job?.url) {
       return NextResponse.json(
-        { success: false, error: "Missing job ID" },
+        { success: false, error: "Invalid job data" },
         { status: 400 }
       )
     }
 
-    // 🔥 1. Trigger n8n workflow
+    // 🔥 1. Trigger n8n workflow (with timeout protection)
     try {
-      await fetch(`${process.env.N8N_BASE_URL}/webhook/apply`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(job),
-      })
+      await Promise.race([
+        fetch(`${process.env.N8N_BASE_URL}/webhook/apply`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(job),
+        }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("n8n timeout")), 3000)
+        ),
+      ])
     } catch (err) {
       console.warn("⚠️ n8n trigger failed:", err)
     }
@@ -55,7 +61,7 @@ export async function POST(req: Request) {
     if (error) {
       console.error("❌ Supabase update error:", error)
       return NextResponse.json(
-        { success: false, error },
+        { success: false, error: "Database update failed" },
         { status: 500 }
       )
     }
