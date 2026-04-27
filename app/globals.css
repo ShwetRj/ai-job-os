@@ -1,49 +1,99 @@
 @import "tailwindcss";
 
-/* 🔥 Reset */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  transition: all 0.15s ease-in-out;
+@layer base {
+  :root {
+    --bg: #020617;
+    --foreground: #e2e8f0;
+  }
+
+  /* 🔥 Base SaaS Styling */
+  body {
+    background: radial-gradient(circle at top center, #0f172a 0%, #020617 100%);
+    background-attachment: fixed; /* Keeps the gradient smooth when scrolling */
+    color: var(--foreground);
+    font-family: system-ui, -apple-system, sans-serif;
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+  }
 }
 
-:root {
-  --bg: #020617;
+@layer components {
+  /* 🔥 Premium Glassmorphism */
+  .glass {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    border-radius: 1rem;
+  }
+
+  /* 🔥 Next-Level Buttons */
+  .btn {
+    @apply flex items-center justify-center font-medium transition-all duration-200;
+    background: linear-gradient(135deg, #3b82f6, #4f46e5);
+    padding: 0.625rem 1rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 14px 0 rgba(79, 70, 229, 0.25);
+  }
+
+  .btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(79, 70, 229, 0.4);
+    filter: brightness(1.1);
+  }
+
+  .btn:active {
+    transform: translateY(1px);
+    box-shadow: 0 2px 10px rgba(79, 70, 229, 0.2);
+  }
 }
 
-/* 🔥 Base */
-body {
-  background: radial-gradient(circle at top, #0f172a, #020617);
-  color: #e2e8f0;
-  font-family: system-ui, sans-serif;
+@layer utilities {
+  /* 🔥 Used in Layout wrapper */
+  .animate-fade-in {
+    animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  /* 🔥 CRITICAL for mobile Kanban boards */
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
 }
 
-/* 🔥 Glass */
-.glass {
-  background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
+/* 🔥 Keyframes */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-/* 🔥 Buttons */
-.btn {
-  background: linear-gradient(135deg, #3b82f6, #6366f1);
-  padding: 10px 16px;
-  border-radius: 10px;
-}
-
-.btn:hover {
-  transform: scale(1.05);
-}
-
-/* 🔥 Scrollbar */
+/* 🔥 Sleek Custom Scrollbar (Vertical & Horizontal) */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
+  height: 8px; /* Important for horizontal Kanban scrolling */
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #3b82f6;
+  background: rgba(255, 255, 255, 0.15);
   border-radius: 10px;
+  /* Adds a "padding" effect inside the scrollbar track */
+  border: 2px solid #020617; 
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
