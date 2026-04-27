@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #020617;
+}
+
+body {
+  background: radial-gradient(circle at top, #0f172a, #020617);
+  color: #e2e8f0;
+  font-family: system-ui, sans-serif;
+}
+
+/* 🔥 Glass card */
+.glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+}
+
+/* 🔥 Gradient button */
+.btn-primary {
+  background: linear-gradient(135deg, #3b82f6, #6366f1);
+  padding: 10px 18px;
+  border-radius: 10px;
+  transition: 0.2s;
+}
+
+.btn-primary:hover {
+  transform: scale(1.05);
+}
